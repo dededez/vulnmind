@@ -1,0 +1,39 @@
+# Local deployment skeleton: PostgreSQL with pgvector plus the VulnMind CLI.
+# Provide POSTGRES_PASSWORD (and optionally VULNMIND_DATABASE_URL) via the
+# environment or an untracked .env file; never commit credentials.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vulnmind}
+      POSTGRES_USER: ${POSTGRES_USER:-vulnmind}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  cli:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      VULNMIND_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-vulnmind}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-vulnmind}
+      VULNMIND_REPORT_ROOT: /data/reports
+      VULNMIND_EVIDENCE_ROOT: /data/evidence
+    volumes:
+      - clidata:/data
+    # Override the command to run one CLI action, for example:
+    #   docker compose run --rm cli scan --repository /repo ...
+    command: ["--help"]
+
+volumes:
+  pgdata:
+  clidata:

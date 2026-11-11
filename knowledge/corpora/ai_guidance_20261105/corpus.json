@@ -1,0 +1,162 @@
+[
+  {
+    "id": "ai-cwe-89-v1",
+    "title": "AI 待复核 CWE-89 SQL 注入",
+    "source_type": "AI_GENERATED",
+    "source_url": "https://cwe.mitre.org/data/definitions/89.html",
+    "version": "2026-11-05",
+    "trust_level": "unverified_ai",
+    "content": "【AI 生成的辅助学习笔记：未经人工审核，不是权威规范】\n主题：SQL 注入（CWE-89）\n风险线索：不可信输入进入 SQL 的结构部分可能改变查询语义。\n审查方向：追踪输入到数据库调用，核查是否存在拼接；分别检查参数绑定与动态表名、列名的处理。\n处理建议：对值使用参数化查询，对无法参数化的标识符使用严格白名单；按最小权限配置数据库账号。\n限制：静态匹配或数据库错误只能作为线索，须在授权环境结合实际调用路径验证。\n参考入口：https://cwe.mitre.org/data/definitions/89.html\n",
+    "content_sha256": "dd68e0bfbe6e6f6192b20cfeafe5de4ba62b6ded9fd78c236af883b58f3f1919"
+  },
+  {
+    "id": "ai-cwe-79-v1",
+    "title": "AI 待复核 CWE-79 跨站脚本 XSS",
+    "source_type": "AI_GENERATED",
+    "source_url": "https://cwe.mitre.org/data/definitions/79.html",
+    "version": "2026-11-05",
+    "trust_level": "unverified_ai",
+    "content": "【AI 生成的辅助学习笔记：未经人工审核，不是权威规范】\n主题：跨站脚本 XSS（CWE-79）\n风险线索：不可信数据进入浏览器可执行上下文时可能导致脚本注入。\n审查方向：确认数据源、输出位置及上下文，区分 HTML、属性、JavaScript 和 URL；查看框架自动转义是否被绕过。\n处理建议：使用与输出上下文匹配的编码并避免危险 DOM API；内容安全策略只能作为额外防线。\n限制：单纯反射不等于脚本可执行，需结合浏览器解析上下文审查。\n参考入口：https://cwe.mitre.org/data/definitions/79.html\n",
+    "content_sha256": "7019dbd44c129b552f3cd25b67d9f5343863dc713331612585c56f015f209760"
+  },
+  {
+    "id": "ai-cwe-918-v1",
+    "title": "AI 待复核 CWE-918 服务端请求伪造 SSRF",
+    "source_type": "AI_GENERATED",
+    "source_url": "https://cwe.mitre.org/data/definitions/918.html",
+    "version": "2026-11-05",
+    "trust_level": "unverified_ai",
+    "content": "【AI 生成的辅助学习笔记：未经人工审核，不是权威规范】\n主题：服务端请求伪造 SSRF（CWE-918）\n风险线索：服务端根据外部输入访问资源，可能越过预期网络边界。\n审查方向：检查 URL 解析、协议、主机和端口限制；核查解析后的地址以及每次重定向是否重新验证。\n处理建议：限制协议、目标和出站路径，拒绝不允许的解析地址，并约束重定向与代理。\n限制：不同部署的内网范围和 DNS 行为不同，单靠字符串校验不足以确认安全。\n参考入口：https://cwe.mitre.org/data/definitions/918.html\n",
+    "content_sha256": "623dfb961fd15b7345801a02ec01df1e0d7d3731b65e7ef0bcc7d63d1f9158e4"
+  },
+  {
+    "id": "ai-cwe-352-v1",
+    "title": "AI 待复核 CWE-352 跨站请求伪造 CSRF",
+    "source_type": "AI_GENERATED",
+    "source_url": "https://cwe.mitre.org/data/definitions/352.html",
+    "version": "2026-11-05",
+    "trust_level": "unverified_ai",
+    "content": "【AI 生成的辅助学习笔记：未经人工审核，不是权威规范】\n主题：跨站请求伪造 CSRF（CWE-352）\n风险线索：浏览器自动附带认证信息时，跨站来源可能诱导用户触发非预期操作。\n审查方向：识别有状态操作、认证方式及令牌校验，检查跨站请求与信任边界。\n处理建议：使用经框架验证的 CSRF 防护并结合适当 Cookie 属性；避免用 GET 执行状态变更。\n限制：SameSite 等机制是分层防护，不能替代对具体业务和浏览器行为的验证。\n参考入口：https://cwe.mitre.org/data/definitions/352.html\n",
+    "content_sha256": "efc9b90b2141ca93a70a70658b65783e0a005054fe9d1fdae31772f64afac67d"
+  },
+  {
+    "id": "ai-cwe-862-v1",
+    "title": "AI 待复核 CWE-862 缺失授权",
+    "source_type": "AI_GENERATED",
+    "source_url": "https://cwe.mitre.org/data/definitions/862.html",
+    "version": "2026-11-05",
+    "trust_level": "unverified_ai",
+    "content": "【AI 生成的辅助学习笔记：未经人工审核，不是权威规范】\n主题：缺失授权（CWE-862；对象级越权是相关场景）\n风险线索：已登录用户可能通过更换对象标识访问不属于其授权范围的数据。\n审查方向：沿读取和修改操作检查每个对象的服务端权限判断，区分租户、角色和对象归属。\n处理建议：默认拒绝并在服务端针对具体对象和动作授权，补充跨用户隔离测试。\n限制：不可预测标识不能替代授权；测试应使用事先授权的测试账号与数据。\n参考入口：https://cwe.mitre.org/data/definitions/862.html\n",
+    "content_sha256": "75270f0c1d0eb61b0e626498a1beb7ad53a09e249840255dfb7430531e4154dd"
+  },
+  {
+    "id": "ai-cwe-434-v1",
+    "title": "AI 待复核 CWE-434 不安全文件上传",
+    "source_type": "AI_GENERATED",
+    "source_url": "https://cwe.mitre.org/data/definitions/434.html",
+    "version": "2026-11-05",
+    "trust_level": "unverified_ai",
+    "content": "【AI 生成的辅助学习笔记：未经人工审核，不是权威规范】\n主题：不安全文件上传（CWE-434）\n风险线索：上传内容若被当成可执行文件或暴露到不可信访问路径，可能带来风险。\n审查方向：检查扩展名、真实内容、大小、文件名和存储位置，以及后续解压和处理流程。\n处理建议：仅允许业务需要的类型，服务端生成名称，隔离存储并限制访问与处理权限。\n限制：文件类型和恶意内容识别存在误判，需组合多层控制并明确业务要求。\n参考入口：https://cwe.mitre.org/data/definitions/434.html\n",
+    "content_sha256": "f70b0d86cb533dd3aeea00f7ae9950e4562260a52d94307ddf147a7066b3348c"
+  },
+  {
+    "id": "ai-cwe-22-v1",
+    "title": "AI 待复核 CWE-22 路径遍历",
+    "source_type": "AI_GENERATED",
+    "source_url": "https://cwe.mitre.org/data/definitions/22.html",
+    "version": "2026-11-05",
+    "trust_level": "unverified_ai",
+    "content": "【AI 生成的辅助学习笔记：未经人工审核，不是权威规范】\n主题：路径遍历（CWE-22）\n风险线索：不可信路径可能被解释为授权目录之外的位置。\n审查方向：检查规范化前后的路径、符号链接、重解析点及检查与使用之间的竞争。\n处理建议：使用允许的相对路径并在打开文件时实施边界限制，尽量使用受控标识映射文件。\n限制：仅过滤 ../ 不足以覆盖所有编码和平台差异；不能把字符串检查当作完整隔离。\n参考入口：https://cwe.mitre.org/data/definitions/22.html\n",
+    "content_sha256": "62c390b41fbb2b6128694a879df51af3c49398f4c257e88f9cd2ee2d0f4fee85"
+  },
+  {
+    "id": "ai-cwe-78-v1",
+    "title": "AI 待复核 CWE-78 系统命令注入",
+    "source_type": "AI_GENERATED",
+    "source_url": "https://cwe.mitre.org/data/definitions/78.html",
+    "version": "2026-11-05",
+    "trust_level": "unverified_ai",
+    "content": "【AI 生成的辅助学习笔记：未经人工审核，不是权威规范】\n主题：系统命令注入（CWE-78）\n风险线索：不可信数据参与命令解释可能改变被执行的操作。\n审查方向：定位进程启动调用，区分 shell 字符串与参数数组，追踪外部输入进入的位置。\n处理建议：优先使用库 API；必须启动进程时使用固定程序与参数数组，并对可变参数做白名单约束。\n限制：参数数组不自动保证安全，目标程序自身的选项和文件访问能力也需检查。\n参考入口：https://cwe.mitre.org/data/definitions/78.html\n",
+    "content_sha256": "8fc650570dc04c670af0dc0373caa8eb2829bca7da6db893fce50ef408640685"
+  },
+  {
+    "id": "ai-cwe-502-v1",
+    "title": "AI 待复核 CWE-502 不安全反序列化",
+    "source_type": "AI_GENERATED",
+    "source_url": "https://cwe.mitre.org/data/definitions/502.html",
+    "version": "2026-11-05",
+    "trust_level": "unverified_ai",
+    "content": "【AI 生成的辅助学习笔记：未经人工审核，不是权威规范】\n主题：不安全反序列化（CWE-502）\n风险线索：对不可信数据进行具备对象构造或代码执行能力的反序列化可能产生严重影响。\n审查方向：确定数据来源与信任边界，检查反序列化库、类型约束和签名校验是否适用。\n处理建议：优先使用受限数据格式和严格 schema，避免对外部数据调用不安全对象反序列化。\n限制：签名或来源校验不能替代更新依赖和限制解析器能力。\n参考入口：https://cwe.mitre.org/data/definitions/502.html\n",
+    "content_sha256": "8160977c20963b61188f560932ed82536fbf8df0e0856838cb7b22ce9d68bedd"
+  },
+  {
+    "id": "ai-cwe-798-v1",
+    "title": "AI 待复核 CWE-798 硬编码凭据",
+    "source_type": "AI_GENERATED",
+    "source_url": "https://cwe.mitre.org/data/definitions/798.html",
+    "version": "2026-11-05",
+    "trust_level": "unverified_ai",
+    "content": "【AI 生成的辅助学习笔记：未经人工审核，不是权威规范】\n主题：硬编码凭据（CWE-798）\n风险线索：凭据出现在源码、配置样本或构建产物中可能造成泄露和权限滥用。\n审查方向：定位候选并核查其是否为有效凭据；在报告中避免复制令牌和完整秘密。\n处理建议：移除硬编码并从专用密钥管理方案注入；若疑似泄露，按组织流程撤销和轮换。\n限制：测试假密钥与真实凭据需区分；不能将哈希或部分遮盖视作绝对保密。\n参考入口：https://cwe.mitre.org/data/definitions/798.html\n",
+    "content_sha256": "37f25d4eac1aa911fe79cf2069c8fde1381a8ddbe988ac87daf5a809478dec6e"
+  },
+  {
+    "id": "ai-cwe-295-v1",
+    "title": "AI 待复核 CWE-295 TLS 证书校验不足",
+    "source_type": "AI_GENERATED",
+    "source_url": "https://cwe.mitre.org/data/definitions/295.html",
+    "version": "2026-11-05",
+    "trust_level": "unverified_ai",
+    "content": "【AI 生成的辅助学习笔记：未经人工审核，不是权威规范】\n主题：TLS 证书校验不足（CWE-295）\n风险线索：关闭证书或主机名校验会削弱连接对服务端身份的验证。\n审查方向：检查 HTTP 客户端、证书链、主机名和自定义信任库配置，确认实际调用路径。\n处理建议：启用证书与主机名验证，使用正确 CA 信任链并处理验证错误。\n限制：检测到配置项不等于生产中一定使用；应保留代码位置和环境限制。\n参考入口：https://cwe.mitre.org/data/definitions/295.html\n",
+    "content_sha256": "c4bb1c2ab6ab4b870eea85ba71b804bfdbdd0b17fbc7c7e7c37906883f379db7"
+  },
+  {
+    "id": "ai-cwe-916-v1",
+    "title": "AI 待复核 CWE-916 密码哈希计算成本不足",
+    "source_type": "AI_GENERATED",
+    "source_url": "https://cwe.mitre.org/data/definitions/916.html",
+    "version": "2026-11-05",
+    "trust_level": "unverified_ai",
+    "content": "【AI 生成的辅助学习笔记：未经人工审核，不是权威规范】\n主题：密码哈希计算成本不足（CWE-916）\n风险线索：不适合密码的快速哈希或缺乏可调整成本的方案会增加离线猜测风险。\n审查方向：检查密码存储算法、每用户随机盐、参数和升级策略，避免记录密码内容。\n处理建议：采用成熟密码哈希方案并根据当前权威建议和部署资源选择参数，支持逐步升级。\n限制：参数要求会随时间和平台变化，不能把一个固定数值当作永久标准。\n参考入口：https://cwe.mitre.org/data/definitions/916.html\n",
+    "content_sha256": "a0e1502f24c49cefe3ffe95adfe56d81c671686d55cafa23bd640a62eefcb1ff"
+  },
+  {
+    "id": "ai-cwe-532-v1",
+    "title": "AI 待复核 CWE-532 日志泄露敏感信息",
+    "source_type": "AI_GENERATED",
+    "source_url": "https://cwe.mitre.org/data/definitions/532.html",
+    "version": "2026-11-05",
+    "trust_level": "unverified_ai",
+    "content": "【AI 生成的辅助学习笔记：未经人工审核，不是权威规范】\n主题：日志泄露敏感信息（CWE-532）\n风险线索：日志中记录凭据、令牌或个人数据会扩大敏感信息暴露面。\n审查方向：检查请求、异常和调试日志的字段、访问权限、保留期及输入中的换行符。\n处理建议：按需记录事件并过滤敏感字段，安全编码日志数据，限制读取与保留期限。\n限制：仅依靠关键字脱敏可能漏报；需结合数据流及实际日志样本审查。\n参考入口：https://cwe.mitre.org/data/definitions/532.html\n",
+    "content_sha256": "77bd4f0d38d0d5f36cd8b9f679569e525478f09455a20066a50f2691ef384d31"
+  },
+  {
+    "id": "ai-cwe-1104-v1",
+    "title": "AI 待复核 CWE-1104 组件过期与维护风险",
+    "source_type": "AI_GENERATED",
+    "source_url": "https://cwe.mitre.org/data/definitions/1104.html",
+    "version": "2026-11-05",
+    "trust_level": "unverified_ai",
+    "content": "【AI 生成的辅助学习笔记：未经人工审核，不是权威规范】\n主题：组件过期与维护风险（CWE-1104）\n风险线索：不受维护或过期的第三方组件可能包含未处理的安全问题。\n审查方向：建立组件清单，核对锁文件、实际安装版本、维护状态以及供应链公告。\n处理建议：制定依赖更新、固定版本与漏洞响应流程，在升级前验证兼容性。\n限制：版本匹配不自动等于可利用，需核对受影响范围、运行路径与修复版本。\n参考入口：https://cwe.mitre.org/data/definitions/1104.html\n",
+    "content_sha256": "7ad274c7d7bfc954b3a61084456713e237d067ccb050c1647e1f0fcb0237b8b0"
+  },
+  {
+    "id": "ai-cwe-327-v1",
+    "title": "AI 待复核 CWE-327 过时或脆弱的加密算法",
+    "source_type": "AI_GENERATED",
+    "source_url": "https://cwe.mitre.org/data/definitions/327.html",
+    "version": "2026-11-05",
+    "trust_level": "unverified_ai",
+    "content": "【AI 生成的辅助学习笔记：未经人工审核，不是权威规范】\n主题：过时或脆弱的加密算法（CWE-327）\n风险线索：采用不适合当前威胁模型的密码算法或模式可能破坏数据保护。\n审查方向：识别加密算法、模式、随机数来源和密钥生命周期，确认用途与数据类型。\n处理建议：使用经过审查的现代库与推荐方案，妥善管理密钥并支持算法迁移。\n限制：加密方案依赖上下文；密码存储通常需要专用密码哈希而非可逆加密。\n参考入口：https://cwe.mitre.org/data/definitions/327.html\n",
+    "content_sha256": "df40ecd098657888169eeec9f6f707f0b75e55772d300c67abd6b3fb0773dbcb"
+  },
+  {
+    "id": "ai-cwe-367-v1",
+    "title": "AI 待复核 CWE-367 检查和使用之间的竞争",
+    "source_type": "AI_GENERATED",
+    "source_url": "https://cwe.mitre.org/data/definitions/367.html",
+    "version": "2026-11-05",
+    "trust_level": "unverified_ai",
+    "content": "【AI 生成的辅助学习笔记：未经人工审核，不是权威规范】\n主题：检查和使用之间的竞争（CWE-367）\n风险线索：先检查文件或资源，再在状态可能变化时使用，可能绕过原有安全判断。\n审查方向：查找权限检查、路径解析与打开或删除之间的窗口，考虑符号链接和并发更换。\n处理建议：尽量使用原子操作、受控目录和适用的平台句柄语义，必要时序列化协作写入。\n限制：应用层互斥不能约束不参与协议的外部进程；平台差异需要真实测试。\n参考入口：https://cwe.mitre.org/data/definitions/367.html\n",
+    "content_sha256": "d935f61740767b9fbf04808d7d51b162c36cf1384dbc26b21e08624af797e923"
+  }
+]

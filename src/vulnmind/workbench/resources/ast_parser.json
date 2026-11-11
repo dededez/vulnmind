@@ -1,0 +1,6 @@
+{
+  "package": "typescript",
+  "version": "6.0.3",
+  "sha256": "569177652966bd528c319171c7dd22860dbf72bde116cbc4f644f1d02bb12e39",
+  "installation": "npm install --prefix .devtools/ast-parser --ignore-scripts --no-audit --no-fund --save-exact typescript@6.0.3"
+}

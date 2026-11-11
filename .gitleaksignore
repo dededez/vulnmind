@@ -1,0 +1,11 @@
+# Gitleaks 忽略清单：以下命中均为测试用假凭据，不是真实密钥。
+# 说明：test_sandbox* 需要 gitleaks 能识别的假 AWS key 才能验证沙箱输出；
+# test_cli_approvals / test_approval_tokens 使用 32 位假审批密钥；
+# test_workbench_probes 使用结构合法但无签名的假 JWT 测试脱敏。
+tests/integration/test_sandbox_gitleaks.py:aws-access-token:45
+tests/integration/test_sandbox_gitleaks.py:aws-access-token:138
+tests/integration/test_cli_approvals.py:generic-api-key:19
+tests/unit/test_sandbox.py:aws-access-token:17
+tests/unit/test_sandbox.py:aws-access-token:30
+tests/unit/test_approval_tokens.py:generic-api-key:15
+tests/unit/test_workbench_probes.py:generic-api-key:28

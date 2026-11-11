@@ -1,0 +1,123 @@
+[
+  {
+    "id": "workbench-sql_injection-2",
+    "title": "VulnMind detection guide v2 / sql_injection",
+    "content": "# SQL 注入 / sql_injection\n\n适用条件：请求参数进入拼接 SQL 或出现数据库异常。布尔检查适用于单引号字符串位置，其他语法、必填参数和认证状态可能导致漏报。\n\n检测步骤：比较重复基线、真假条件并反转执行顺序；真条件应匹配基线，假条件重复一致。错误检查仅认挑战独有数据库特征。\n\n误报排查：排除输入反射、WAF 拒绝、动态页面、缓存、分页和网络波动；不以一次错误或延迟确认注入。\n\n证据要求：保存精确请求、状态、完整响应摘要、重复对照、源码位置。只生成候选，不枚举表或提取数据。\n\n修复建议：使用参数化查询，标识符映射到固定允许列表，数据库账户最小权限。\n\n参考：https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html\n\n本卡是 VulnMind 项目编写的检测方法摘要，不是 OWASP 原文，也不是目标漏洞证据。\n\n检索词：SQL injection boolean differential parameterized queries false positives\n",
+    "source_type": "project_detection_guide",
+    "source_url": "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html",
+    "version": "2.0.0",
+    "trust_level": "project_curated",
+    "vulnerability_type": "sql_injection",
+    "content_sha256": "5b1f76babaf1480fb670716583f5bc976392dbec621ef8f1b390b560fb545816"
+  },
+  {
+    "id": "workbench-xss-2",
+    "title": "VulnMind detection guide v2 / xss",
+    "content": "# XSS 与 HTML 注入 / xss\n\n适用条件：输入进入 HTML 或客户端 DOM；反射本身不是脚本执行。\n\n检测步骤：先用两个不同惰性自定义标签确认 HTML 元素上下文，检查 Content-Type 与编码；纯文本和 JSON 不等于 HTML 执行。\n\n误报排查：排除转义标签、textarea/title/script/style/template 文本上下文、跨响应固定内容及模板示例。解析器只是启发式，不模拟所有浏览器行为。\n\n证据要求：记录输入、响应上下文、响应头和摘要；没有浏览器执行证据时仅报告 HTML 注入候选。\n\n修复建议：按输出位置编码，富文本使用成熟净化库，避免不可信 innerHTML，CSP 为附加防御。\n\n参考：https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html\n\n本卡是 VulnMind 项目编写的检测方法摘要，不是 OWASP 原文，也不是目标漏洞证据。\n\n检索词：cross site scripting XSS output encoding HTML context reflected input\n",
+    "source_type": "project_detection_guide",
+    "source_url": "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html",
+    "version": "2.0.0",
+    "trust_level": "project_curated",
+    "vulnerability_type": "xss",
+    "content_sha256": "17b5eaeaab6ce216870828b8e812847e21c8b84b4f57711764d6f7b2c9f0d941"
+  },
+  {
+    "id": "workbench-ssti-2",
+    "title": "VulnMind detection guide v2 / ssti",
+    "content": "# 服务端模板注入 / ssti\n\n适用条件：请求数据被当作模板源码而非模板变量。\n\n检测步骤：两组不同有界整数表达式与基线比较，预期结果应各自出现且互不交叉。\n\n误报排查：排除原样反射、固定演示结果、客户端计算和正常业务计算接口。\n\n证据要求：双表达式只能确认求值行为；不能推断任意代码执行，需要结合源码与业务意图。\n\n修复建议：固定模板，将输入作为数据传入；避免对不可信模板进行编译。\n\n参考：https://cheatsheetseries.owasp.org/cheatsheets/Injection_Prevention_Cheat_Sheet.html\n\n本卡是 VulnMind 项目编写的检测方法摘要，不是 OWASP 原文，也不是目标漏洞证据。\n\n检索词：server side template injection expression evaluation untrusted template\n",
+    "source_type": "project_detection_guide",
+    "source_url": "https://cheatsheetseries.owasp.org/cheatsheets/Injection_Prevention_Cheat_Sheet.html",
+    "version": "2.0.0",
+    "trust_level": "project_curated",
+    "vulnerability_type": "ssti",
+    "content_sha256": "70fca40dce5fd6bb72bec5445d9a80ee85ee0d674fe3c1486b749c2317a26f65"
+  },
+  {
+    "id": "workbench-cors-2",
+    "title": "VulnMind detection guide v2 / cors",
+    "content": "# 跨域访问策略 / cors\n\n适用条件：GET 接口需要跨域访问策略检查。\n\n检测步骤：以基线和两个不同的保留 .invalid Origin 请求同一接口；只发送 Origin 头，不访问这些域名。\n\n误报排查：任意源反射且 allow-credentials=true 是候选；公共数据、SameSite、浏览器凭据策略可能阻止实际影响。星号与凭据组合不会直接证明可读。\n\n证据要求：保存响应头及对照，真实跨域敏感数据读取需要额外浏览器与账户证据。\n\n修复建议：精确允许可信 Origin，按需允许凭据，正确设置 Vary: Origin。\n\n参考：https://cheatsheetseries.owasp.org/cheatsheets/HTML5_Security_Cheat_Sheet.html#cross-origin-resource-sharing\n\n本卡是 VulnMind 项目编写的检测方法摘要，不是 OWASP 原文，也不是目标漏洞证据。\n\n检索词：CORS origin credentials access control sensitive response\n",
+    "source_type": "project_detection_guide",
+    "source_url": "https://cheatsheetseries.owasp.org/cheatsheets/HTML5_Security_Cheat_Sheet.html#cross-origin-resource-sharing",
+    "version": "2.0.0",
+    "trust_level": "project_curated",
+    "vulnerability_type": "cors",
+    "content_sha256": "c147cd90ae55d6c0072d24f25e20112d1a456034b7642296d82588d8c0592bd1"
+  },
+  {
+    "id": "workbench-security_headers-2",
+    "title": "VulnMind detection guide v2 / security_headers",
+    "content": "# HTTP 安全响应头 / security_headers\n\n适用条件：HTML 响应适合浏览器防御头检查。\n\n检测步骤：重复检查 Content-Type、Content-Security-Policy、X-Content-Type-Options；缺失只是加固线索。\n\n误报排查：不把 JSON API 缺少 CSP 当作 XSS；策略存在不代表策略有效，重复头也需要人工检查。\n\n证据要求：记录响应类型和缺失项；不要因缺少响应头提升为已确认漏洞。\n\n修复建议：结合业务部署 CSP 与 nosniff，避免破坏合法内容加载。\n\n参考：https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html\n\n本卡是 VulnMind 项目编写的检测方法摘要，不是 OWASP 原文，也不是目标漏洞证据。\n\n检索词：HTTP security headers content security policy nosniff HTML\n",
+    "source_type": "project_detection_guide",
+    "source_url": "https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html",
+    "version": "2.0.0",
+    "trust_level": "project_curated",
+    "vulnerability_type": "security_headers",
+    "content_sha256": "20d205bd38e1c17455afd7233a941d92e3cda2918b31e80bfbe25e652cb82dd4"
+  },
+  {
+    "id": "workbench-ssrf-2",
+    "title": "VulnMind detection guide v2 / ssrf",
+    "content": "# 服务端请求伪造 / ssrf\n\n适用条件：用户可控制服务器出站请求目的地；调用 requests/httpx 只是静态线索。\n\n检测步骤：追踪输入到请求 URL、重定向和 DNS 的数据流；本版本无专用主动 SSRF 验证器。\n\n误报排查：固定 URL、允许列表、业务代理及隔离网络需区分；普通外部 HTTP 调用不是漏洞。\n\n证据要求：需要授权回调或可核对的目标侧日志；当前只列需补充上下文。\n\n修复建议：限制协议与目的地址，解析后检查 IP，重定向逐跳检查，阻止内网和元数据目的地。\n\n参考：https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html\n\n本卡是 VulnMind 项目编写的检测方法摘要，不是 OWASP 原文，也不是目标漏洞证据。\n\n检索词：server side request forgery SSRF outbound URL validation\n",
+    "source_type": "project_detection_guide",
+    "source_url": "https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html",
+    "version": "2.0.0",
+    "trust_level": "project_curated",
+    "vulnerability_type": "ssrf",
+    "content_sha256": "ae04135da99f268ec047653d9e2f19e680cbff7d58619d4686d95a22e2163121"
+  },
+  {
+    "id": "workbench-path_traversal-2",
+    "title": "VulnMind detection guide v2 / path_traversal",
+    "content": "# 路径遍历 / path_traversal\n\n适用条件：请求输入影响文件路径，open/read/send_file 等调用只形成调查线索。\n\n检测步骤：分析规范化后的路径是否落在允许根目录内；本版本不发送路径穿越或读取敏感文件。\n\n误报排查：注意符号链接、双重解码和不同操作系统分隔符；固定文件读取不构成漏洞。\n\n证据要求：需要输入到文件操作的完整路径和专用无敏感内容夹具；当前标注需补充上下文。\n\n修复建议：固定资源 ID 映射，规范化并检查根目录包含关系，避免直接拼接用户路径。\n\n参考：https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html\n\n本卡是 VulnMind 项目编写的检测方法摘要，不是 OWASP 原文，也不是目标漏洞证据。\n\n检索词：path traversal file access canonical path validation\n",
+    "source_type": "project_detection_guide",
+    "source_url": "https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html",
+    "version": "2.0.0",
+    "trust_level": "project_curated",
+    "vulnerability_type": "path_traversal",
+    "content_sha256": "eba8b30b10501cd4713c2f5eef3cc8f8a937720567ede607cf657a9a0f8969e3"
+  },
+  {
+    "id": "workbench-command_injection-2",
+    "title": "VulnMind detection guide v2 / command_injection",
+    "content": "# 命令注入 / command_injection\n\n适用条件：用户输入影响进程命令、参数或 shell；subprocess 调用本身不是漏洞。\n\n检测步骤：区分 shell 字符串和参数数组，审查可执行文件与参数允许列表；本版本不执行注入命令。\n\n误报排查：参数注入不同于 shell 注入；固定命令和验证过的参数可能安全。\n\n证据要求：需数据流证据和受控无副作用验证；静态命中保留为线索。\n\n修复建议：使用语言 API 替代命令，固定程序与参数列表，避免 shell=True。\n\n参考：https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html\n\n本卡是 VulnMind 项目编写的检测方法摘要，不是 OWASP 原文，也不是目标漏洞证据。\n\n检索词：OS command injection argument separation shell execution\n",
+    "source_type": "project_detection_guide",
+    "source_url": "https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html",
+    "version": "2.0.0",
+    "trust_level": "project_curated",
+    "vulnerability_type": "command_injection",
+    "content_sha256": "c4962b68eab81c293abc3baa971d10868769f582625eccced60a963a7570d8ef"
+  },
+  {
+    "id": "workbench-deserialization-2",
+    "title": "VulnMind detection guide v2 / deserialization",
+    "content": "# 不安全反序列化 / deserialization\n\n适用条件：不可信数据进入 pickle、非安全 YAML 或对象反序列化。\n\n检测步骤：检查输入信任边界和加载器配置；不运行反序列化利用链。\n\n误报排查：安全 JSON 解析不能等同对象反序列化，可信内部数据也需核查真实性。\n\n证据要求：保存调用点和输入来源，缺少传播路径时标注需补充上下文。\n\n修复建议：使用纯数据格式与模式校验，避免对不可信内容恢复任意对象。\n\n参考：https://cheatsheetseries.owasp.org/cheatsheets/Deserialization_Cheat_Sheet.html\n\n本卡是 VulnMind 项目编写的检测方法摘要，不是 OWASP 原文，也不是目标漏洞证据。\n\n检索词：insecure deserialization untrusted data safe formats\n",
+    "source_type": "project_detection_guide",
+    "source_url": "https://cheatsheetseries.owasp.org/cheatsheets/Deserialization_Cheat_Sheet.html",
+    "version": "2.0.0",
+    "trust_level": "project_curated",
+    "vulnerability_type": "deserialization",
+    "content_sha256": "6e8cbfb2aef438f17597d81139aca40fcde7c848aa02f9110ab0d3724c0aa285"
+  },
+  {
+    "id": "workbench-xxe-2",
+    "title": "VulnMind detection guide v2 / xxe",
+    "content": "# XML 外部实体 / xxe\n\n适用条件：不可信 XML 进入支持外部实体的解析器。\n\n检测步骤：检查解析器版本、外部实体和 DTD 配置；本版本不读取文件或发起 XXE 回连。\n\n误报排查：解析 XML 本身不是 XXE；默认配置与库版本可能禁用外部实体。\n\n证据要求：需实际配置和受控夹具证明；只有 parse 调用时保持线索。\n\n修复建议：禁用 DTD 和外部实体，使用安全解析器并限制输入资源消耗。\n\n参考：https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html\n\n本卡是 VulnMind 项目编写的检测方法摘要，不是 OWASP 原文，也不是目标漏洞证据。\n\n检索词：XML external entity XXE parser external entities\n",
+    "source_type": "project_detection_guide",
+    "source_url": "https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html",
+    "version": "2.0.0",
+    "trust_level": "project_curated",
+    "vulnerability_type": "xxe",
+    "content_sha256": "ae8acbe85fc9bccfd8107afbd620dbc23f260281d5793c16e39a6c3cbcfab9cd"
+  },
+  {
+    "id": "workbench-open_redirect-2",
+    "title": "VulnMind detection guide v2 / open_redirect",
+    "content": "# 不受控跳转 / open_redirect\n\n适用条件：用户可控制跳转目的地址。\n\n检测步骤：审查目的地址规范化和允许列表；本版本仅静态识别，不执行跨域跳转。\n\n误报排查：固定跳转、相对站内路径或明确外链提示可能符合预期。\n\n证据要求：需具体可控参数与 Location 证据；静态 redirect 调用不等于漏洞。\n\n修复建议：用固定目的 ID 映射，规范化后精确校验目标来源。\n\n参考：https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html\n\n本卡是 VulnMind 项目编写的检测方法摘要，不是 OWASP 原文，也不是目标漏洞证据。\n\n检索词：unvalidated redirect destination allowlist\n",
+    "source_type": "project_detection_guide",
+    "source_url": "https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html",
+    "version": "2.0.0",
+    "trust_level": "project_curated",
+    "vulnerability_type": "open_redirect",
+    "content_sha256": "d5b11568c62f1b19ae354555011c7f16ba7bd6ad74cba90d7bc243797f36f71f"
+  }
+]

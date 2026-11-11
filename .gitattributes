@@ -1,0 +1,10 @@
+* text=auto
+
+# Corpus files are compared byte-for-byte with their manifest; never rewrite
+# their line endings on checkout.
+knowledge/corpora/** -text
+
+*.png binary
+*.jpg binary
+*.zip binary
+*.docx binary
