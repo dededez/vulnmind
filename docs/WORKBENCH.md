@@ -14,7 +14,7 @@
 .venv/Scripts/python.exe -m vulnmind ui --port 8765
 ```
 
-也可以运行项目根目录 `start-workbench.ps1`。打开 `http://127.0.0.1:8765/`，保留服务进程运行；在终端按 Ctrl+C 关闭。当前用户的 `.env` 已配置数据库、证据/报告目录、本机审批与报告签名，三个 HTTP 能力 `fetch`、`crawl`、`validate-run` 已启用。不要把 `.env` 复制进文档或版本库。
+也可以运行项目根目录 `start-workbench.cmd`（前台）或 `start-workbench-background.cmd`（后台常驻）。打开 `http://127.0.0.1:8765/`，保留服务进程运行；在终端按 Ctrl+C 关闭。当前用户的 `.env` 已配置数据库、证据/报告目录、本机审批与报告签名，三个 HTTP 能力 `fetch`、`crawl`、`validate-run` 已启用。不要把 `.env` 复制进文档或版本库。
 
 新环境需先安装 `pyproject.toml` 中的依赖、配置 PostgreSQL/pgvector 与可信 WSL `VulnMindLab`，备份数据库后迁移至 `0018_workbench_jobs`。已有开发环境可用 `scripts/setup_durable_runtime.py` 先备份再升级。该脚本仅接受 loopback PostgreSQL，并核对知识片段数量保持不变。
 

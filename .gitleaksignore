@@ -9,3 +9,5 @@ tests/unit/test_sandbox.py:aws-access-token:17
 tests/unit/test_sandbox.py:aws-access-token:30
 tests/unit/test_approval_tokens.py:generic-api-key:15
 tests/unit/test_workbench_probes.py:generic-api-key:28
+# 误报：双身份表单把“私有资源（owner_only）”绑定到复选框，不含任何密钥。
+src/vulnmind/workbench/static/app.js:generic-api-key:93

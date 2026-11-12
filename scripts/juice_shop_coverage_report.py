@@ -23,8 +23,9 @@ def main():
     parser.add_argument('--label', default='fixed-config')
     args = parser.parse_args()
     truth = json.loads(args.truth.read_text(encoding='utf-8'))
-    result = json.loads(args.result.read_text(encoding='utf-8')).get('result') or {}
-    report, entries, covered = build_report(truth, result, args.label)
+    saved = json.loads(args.result.read_text(encoding='utf-8'))
+    result = saved.get('result') or {}
+    report, entries, covered = build_report(truth, result, args.label, config=saved.get('config'))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(dict(report=report, entries=entries), ensure_ascii=False, indent=1) + '\n',
                            encoding='utf-8')

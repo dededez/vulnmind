@@ -78,6 +78,7 @@ class UnifiedInvestigation:
         self.config=job.config; self.scope=Authorization.model_validate(self.config['scope'])
         self.actor=self.config['actor']; self.scan=uuid5(job.id,'unified-scan')
         self.version=self.config.get('pipeline_version',1)
+        self.adapter=self.config.get('target_adapter','generic') if self.version>=7 else 'juice_shop'
         self.knowledge_provider=knowledge_provider
         self.knowledge=None
         self.journal=Journal(engine,job.id,dict(version=self.version,project=str(job.project_id),config=self.config),self.actor,'web')
@@ -523,27 +524,60 @@ class UnifiedInvestigation:
             self.account_status=dict(email=self.account['email'],session_established=False,
                 register_status=responses[0].get('status_code') if responses else None)
 
-    def run_browser_action(self,action,reservation):
+    def run_browser_action(self,action,reservation,approval=None,source=None):
         """Navigate once in a real browser; every subresource is charged to the ledger."""
         from vulnmind.workbench.browser import BrowserRunner,evaluate_browser,BrowserUnavailable
         from vulnmind.workbench.redaction import redact_tokens
-        runner=BrowserRunner(self.scope,self.config['origin'])
-        def compute(_):
+        if source is not None: verify_snapshot(source)
+        def transport(method,url):
+            with Session(self.engine) as session:
+                row=session.get(Approval,UUID(approval['approval_id']))
+                expiry=row.expires_at if row else None
+                if expiry and expiry.tzinfo is None: expiry=expiry.replace(tzinfo=timezone.utc)
+                if row is None or row.status!='consumed' or not expiry or expiry<=datetime.now(timezone.utc) or row.operation_hash!=approval['digest']:
+                    raise ValueError('browser approval expired or mismatched')
+            if 'validate-run' not in self.settings.enabled_http_commands: raise ValueError('HTTP capability disabled')
+            check_target(Target(type='web',locator=url),self.scope)
+            addresses=sorted({i[4][0] for i in socket.getaddrinfo(urlsplit(url).hostname,None,type=socket.SOCK_STREAM)})
+            check_resolved_addresses(Target(type='web',locator=url),self.scope,addresses)
+            from vulnmind.analysis.http_broker import IsolatedHttpBroker
+            broker=IsolatedHttpBroker(self.scope,distro=self.settings.http_broker_distro,ca_file=self.settings.http_ca_file,max_body_bytes=200000)
+            return (self.http or broker.request_api)(method=method,url=url,headers={'Accept':'*/*'},body='',addresses=addresses,
+                approval_digest=approval['digest'],auth_origin=self.config['origin'])
+        runner=BrowserRunner(self.scope,self.config['origin'],max_requests=40 if self.version>=7 else 120,transport=transport)
+        def compute(audit):
+            retry_reservation=None
+            if self.version>=7:
+                from vulnmind.persistence.models import DurableStep
+                with Session(self.engine) as session:
+                    step=session.get(DurableStep,audit.parent)
+                    if step.attempt>1:
+                        retry_reservation='browser-retry:'+str(step.id)+':'+str(step.attempt)
+                        self.budget.reserve(retry_reservation,action['cost'])
             try:
-                outcome=runner.run(action['url'])
+                if self.version>=7:
+                    runs=[runner.run(url) for url in (action['baseline_url'],action['url'],action['url'])]
+                    outcome={**runs[-1],'causal_runs':[{k:r.get(k) for k in ('dialogs','status_code','blocked','html_truncated')} for r in runs],
+                        'requests':sum(r['requests'] for r in runs),'html':json.dumps(runs,ensure_ascii=False),
+                        'request_paths':[p for r in runs for p in r['request_paths']],
+                        'blocked':[p for r in runs for p in r['blocked']]}
+                else: outcome=runner.run(action['url'])
             except BrowserUnavailable as exc:
+                if self.version>=7: raise StepUnknown('browser run uncertain; reservation retained') from exc
                 return dict(unavailable=str(exc)[:200],body='',sha256='',requests=0,blocked=[],dialogs=[],
                             title='',elapsed_ms=0,status_code=None)
             except Exception as exc:  # noqa: BLE001 - unknown browser failure is not tested
+                if self.version>=7: raise StepUnknown('browser run uncertain; reservation retained') from exc
                 return dict(unavailable='browser error '+type(exc).__name__,body='',sha256='',requests=0,
                             blocked=[],dialogs=[],title='',elapsed_ms=0,status_code=None)
             body,redacted=redact_tokens(outcome['html'])
             return dict(body=body,sha256=hashlib.sha256(body.encode()).hexdigest(),requests=outcome['requests'],
                 request_paths=outcome['request_paths'],blocked=outcome['blocked'],dialogs=outcome['dialogs'],
-                title=outcome['title'],elapsed_ms=outcome['elapsed_ms'],status_code=outcome['status_code'],redacted=redacted)
+                title=outcome['title'],elapsed_ms=outcome['elapsed_ms'],status_code=outcome['status_code'],redacted=redacted,
+                **(dict(causal_runs=outcome['causal_runs'],retry_reservation=retry_reservation) if 'causal_runs' in outcome else {}))
         receipt=self.stage('browser_'+action['id'],dict(url=action['url'],kind=action['kind']),compute)
         actual=int(receipt.get('requests') or 0)
-        if self.version>=6: self.budget.settle(reservation,actual)
+        if self.version>=6: self.budget.settle(receipt.get('retry_reservation') or reservation,actual)
         if receipt.get('unavailable'):
             return dict(action_id=action['id'],kind=action['kind'],url=action['url'],method='GET',
                 parameter=action.get('parameter',''),category=action['category'],verdict='inconclusive',behavior=None,
@@ -551,19 +585,23 @@ class UnifiedInvestigation:
                 browser=None,detector_version=action.get('detector_version')),actual
         outcome=dict(status_code=receipt.get('status_code'),requests=actual,blocked=receipt.get('blocked') or [],
             dialogs=receipt.get('dialogs') or [],title=receipt.get('title'),elapsed_ms=receipt.get('elapsed_ms'),
-            html=receipt.get('body',''),sha256=receipt.get('sha256',''))
+            html=receipt.get('body',''),sha256=receipt.get('sha256',''),causal_runs=receipt.get('causal_runs',[]))
         return evaluate_browser(action,outcome),actual
 
     def run_auth_idor(self,action,approval,source,reservation):
         """Read-only cross-account check with the one authorized test account."""
         from vulnmind.workbench.detectors import evaluate_idor
+        if action.get('access_check'):
+            from vulnmind.workbench.access_control import requests_for,evaluate
+            responses=[]
+            for spec in requests_for(action):
+                responses.append(self.stage(f"http_{action['id']}_{spec['variant']}",dict(request=spec,approval=approval),
+                    lambda audit,r=spec:self.send(r,approval,source,audit)))
+            self.budget.settle(reservation,len(responses))
+            return evaluate(action,responses),len(responses)
         own=int(self.account_bid or 0)
-        # Seeded demo baskets use low ids; probe a few rather than only neighbouring ids.
-        ids=[own]+[value for value in (1,2,3) if value!=own]
-        ids=ids[:4]
-        origin=self.config['origin'].rstrip('/')
-        specs=[dict(method='GET',url=origin+'/rest/basket/'+str(bid),body='',
-                    headers={'Accept':'application/json'},variant=index) for index,bid in enumerate(ids)]
+        from vulnmind.workbench.adapters.juice_shop import seeded_requests
+        specs=seeded_requests(self.config['origin'],own)
         responses=[]
         for spec in specs:
             responses.append(self.stage(f"http_{action['id']}_{spec['variant']}",dict(request=spec,approval=approval),
@@ -574,7 +612,12 @@ class UnifiedInvestigation:
     def run(self):
         from vulnmind.workbench import detectors
         from vulnmind.workbench.knowledge import snapshot as knowledge_snapshot
-        request_builder=detectors.requests_for if self.version>=2 else requests_for
+        base_builder=detectors.requests_for if self.version>=2 else requests_for
+        def request_builder(action):
+            specs=base_builder(action)
+            if self.version>=7 and action['kind'] in {'response_disclosure','exposed_file','config_exposure','well_known_exposure','sql_login','weak_password'}:
+                specs=[{**r,'no_session':True} for r in specs]
+            return specs
         evaluator=detectors.evaluate if self.version>=2 else evaluate
         with workflow_lock(self.engine,self.job.id):
             if self.version>=6:
@@ -624,15 +667,21 @@ class UnifiedInvestigation:
                     mapped=self.stage('discovery_mapping',dict(source=source['digest'],observed=observed),
                         lambda _:correlate(source,observed+imported_routes(self.config.get('routes',[]),self.config['origin']),self.config,self.scope),safe=True)
             all_actions=detectors.actions_for(mapped,list(dict.fromkeys(self.config['detectors'])),limit=240 if self.version>=6 else 60) if self.version>=2 else actions_for(mapped)
-            if self.version>=6:
+            if self.version>=6 and self.adapter=='juice_shop':
                 all_actions+=detectors.synthetic_actions(self.config['origin'],list(dict.fromkeys(self.config['detectors'])),
                     auth_probe=bool(self.config.get('auth_probe')),existing=all_actions,account=bool(self.account))
+            if self.version>=7:
+                all_actions=[a for a in all_actions if a['kind'] not in {'browser_xss','auth_idor'}]
+                from vulnmind.workbench.access_control import actions as access_actions
+                if 'auth_idor' in self.config['detectors']: all_actions+=access_actions(self.config.get('access_checks',[]))
+                from vulnmind.workbench.browser_checks import actions as browser_actions
+                if 'browser_xss' in self.config['detectors']: all_actions+=browser_actions(mapped)
             if self.version>=4:
                 for action in all_actions:
                     if action['kind']=='sql_boolean': action.update(boolean_closures=True,cost=18)
-            knowledge_rounds=[]; coverage=[]; tool_routing=None
+            knowledge_rounds=[]; knowledge_round_numbers=[]; coverage=[]; tool_routing=None
             if self.version>=2:
-                coverage=self.stage('classification',dict(mapping=mapped),lambda _:dict(items=detectors.classify(mapped)),safe=True)['items']
+                coverage=self.stage('classification',dict(mapping=mapped),lambda _:dict(items=detectors.classify(mapped,enabled=self.config['detectors'] if self.version>=7 else None)),safe=True)['items']
             if self.version>=3:
                 from vulnmind.integrations.hexstrike.router import workbench_snapshot
                 val_receipts=self.load_external_validation()
@@ -675,11 +724,12 @@ class UnifiedInvestigation:
                         if self.version>=3:
                             from vulnmind.integrations.hexstrike.knowledge import extend_context
                             return extend_context(self.engine,saved,tool_routing,
-                                action_ids=({a['id'] for a in remaining} if self.version>=5 else None))
+                                action_ids=({a['id'] for a in remaining} if self.version>=5 else None),
+                                selected_only=self.version>=7)
                         return saved
                     self.knowledge=self.stage(f'knowledge_{number}',dict(categories=categories,mode=self.config['knowledge_mode'],previous=observations,
                         **(dict(tool_routing_digest=digest(tool_routing)) if self.version>=3 else {})),obtain_knowledge,safe=True)
-                    knowledge_rounds.append(self.knowledge)
+                    knowledge_rounds.append(self.knowledge);knowledge_round_numbers.append(number)
                     supported={tool for skill in self.knowledge['skills'] for tool in skill['tools']}
                     if any(a['kind'] not in supported for a in remaining if a['category'] in categories):
                         raise ValueError('selected skill does not support the planned detector')
@@ -715,6 +765,9 @@ class UnifiedInvestigation:
                         from vulnmind.workbench.account import login_requests,register_requests
                         account_reqs=(register_requests(self.config['origin'],self.account['email'],self.account['password'])
                                       +login_requests(self.config['origin'],self.account['email'],self.account['password']))
+                        if self.version>=7:
+                            account_reqs=[{**r,'body':'','account_request':i,'account_profile':self.config['account_profile'],
+                                'body_sha256':hashlib.sha256(r['body'].encode()).hexdigest()} for i,r in enumerate(account_reqs)]
                         builtin_reqs.extend(account_reqs)
                         rem_budget-=len(account_reqs)
                     for a in actions:
@@ -738,8 +791,10 @@ class UnifiedInvestigation:
                         else:
                             builtin_reqs.extend(request_builder(a))
                             if self.version>=4: rem_budget-=a['cost']
-                    browser_actions=[dict(id=a['id'],url=a['url'],cost=a['cost']) for a in actions if a['kind'] in BROWSER_KINDS]
-                    auth_actions=[dict(id=a['id'],url=a['url'],cost=a['cost']) for a in actions if a['kind'] in AUTH_KINDS]
+                    browser_actions=[dict(id=a['id'],url=a['url'],cost=a['cost'],baseline_url=a.get('baseline_url'),marker=a.get('marker'),repetitions=2,subresource_methods=['GET','HEAD']) for a in actions if a['kind'] in BROWSER_KINDS]
+                    from vulnmind.workbench.access_control import requests_for as access_requests
+                    auth_actions=[dict(id=a['id'],url=a['url'],cost=a['cost'],
+                        **(dict(requests=access_requests(a)) if a.get('access_check') else {})) for a in actions if a['kind'] in AUTH_KINDS]
                     plan_value=dict(
                         actions=actions,
                         requests=builtin_reqs,
@@ -807,7 +862,7 @@ class UnifiedInvestigation:
                             self.skipped_for_budget+=len(actions)-position
                             break
                     if action['kind'] in BROWSER_KINDS:
-                        result,actual=self.run_browser_action(action,reservation)
+                        result,actual=self.run_browser_action(action,reservation,approval,source)
                         used+=actual
                     elif action['kind'] in AUTH_KINDS:
                         result,actual=self.run_auth_idor(action,approval,source,reservation)
@@ -848,12 +903,12 @@ class UnifiedInvestigation:
                         followup=independent_followup(action,stored)
                         if followup and not any(a['id']==followup['id'] for a in all_actions): all_actions.insert(0,followup)
                     if self.version>=6 and action['kind'] in {'well_known_exposure','response_disclosure'} \
-                            and '/ftp/' in action['url'] and 'exposed_file' in self.config['detectors']:
+                            and (self.version>=7 or '/ftp/' in action['url']) and 'exposed_file' in self.config['detectors']:
                         # One listing is enough to derive a few bounded file reads; the
                         # next round decides whether they are worth spending requests on.
                         from vulnmind.workbench.detectors import file_followups
                         listing=next((r['body'] for r in responses if 200<=r['status_code']<300),'')
-                        for followup in file_followups(self.config['origin'],listing):
+                        for followup in file_followups(self.config['origin'],listing,**(dict(base_url=action['url']) if self.version>=7 else {})):
                             if not any(a['id']==followup['id'] for a in all_actions): all_actions.insert(0,followup)
                 observations+=round_results
                 if budget_stop:
@@ -872,7 +927,8 @@ class UnifiedInvestigation:
             reported_used=self.budget.snapshot()['charged'] if self.version>=6 else used
             final=self.stage('report',dict(source=source['digest'],observations=observations,critics=critiques),
                 lambda _: dict(schema_version='workbench-'+str(self.version),job_id=str(self.job.id),scan_id=str(self.scan),name=self.job.name,
-                    origin=self.config['origin'],repository=repo,mapping=mapped,observations=observations,critics=critiques,
+                    origin=self.config['origin'],repository=repo,mapping=mapped,
+                    **(dict(target_adapter=self.adapter,knowledge_round_numbers=knowledge_round_numbers) if self.version>=7 else {}),observations=observations,critics=critiques,
                     source_snapshot=source['digest'],requests_used=reported_used,
                     **(dict(external_recon=recon_summary) if recon_summary else {}),
                     **(dict(assessment='not_tested' if not observations else 'partial',
@@ -885,7 +941,7 @@ class UnifiedInvestigation:
                         account=self.account_status) if self.version>=6 else {}),
                     **(dict(knowledge=knowledge_rounds,coverage=coverage,detectors=self.config['detectors'],
                             untested_action_count=len(all_actions)-len(attempted)) if self.version>=2 else {}),
-                    limitations=['部署关系由本机操作者声明；静态路由不等于实际调用链证明','自动确认仅限具体差分行为；不声称任意代码执行或完整漏洞覆盖','登录交互和 JavaScript 浏览器自动化未执行；HAR 仅提供观察端点']),
+                    limitations=['部署关系由本机操作者声明；静态路由不等于实际调用链证明','自动确认仅限具体差分行为；不声称任意代码执行或完整漏洞覆盖','认证和浏览器仅在配置并有执行回执时覆盖；未运行部分不代表安全']),
                 persist=self.persist_report,safe=True)
             verify_snapshot(source)
             from vulnmind.reports.store import ReportStore
@@ -912,18 +968,39 @@ class UnifiedInvestigation:
         host=urlsplit(spec['url']).hostname
         addresses=sorted({item[4][0] for item in socket.getaddrinfo(host,None,type=socket.SOCK_STREAM)})
         check_resolved_addresses(Target(type='web',locator=spec['url']),self.scope,addresses)
+        wire_body=spec['body']
+        if self.version>=7 and 'account_request' in spec:
+            from vulnmind.workbench.account import register_requests,login_requests
+            if spec['account_profile']!=self.config.get('account_profile') or self.account is None:
+                raise ValueError('account request binding changed')
+            actual=(register_requests(self.config['origin'],self.account['email'],self.account['password'])+
+                login_requests(self.config['origin'],self.account['email'],self.account['password']))[spec['account_request']]
+            if actual['url']!=spec['url'] or actual['method']!=spec['method'] or hashlib.sha256(actual['body'].encode()).hexdigest()!=spec['body_sha256']:
+                raise ValueError('account secret request hash changed')
+            wire_body=actual['body']
         headers=dict(spec['headers']); credentials={}
         if self.session_headers and not spec.get('no_session'):
             headers.update(self.session_headers)
-        if self.config.get('credential_profile'):
-            credentials=self.vault.load(self.config['credential_profile'],self.config['origin']);headers.update(credentials)
+        credential=self.config.get('credential_profile')
+        if self.version>=7:
+            credential=spec.get('credential_override',None if spec.get('no_session') else credential)
+        if credential:
+            credentials=self.vault.load(credential,self.config['origin']);headers.update(credentials)
+        if self.version>=7:
+            from vulnmind.persistence.models import DurableStep
+            with Session(self.engine) as session:
+                step=session.get(DurableStep,audit.parent)
+                if step.attempt>1:
+                    retry_key='retry:'+str(step.id)+':'+str(step.attempt)
+                    self.budget.reserve(retry_key,1);self.budget.settle(retry_key,1)
         if self.last_request: time.sleep(max(0,.25-(time.monotonic()-self.last_request)))
         self.last_request=time.monotonic()
         from vulnmind.analysis.http_broker import IsolatedHttpBroker
         broker=IsolatedHttpBroker(self.scope,distro=self.settings.http_broker_distro,ca_file=self.settings.http_ca_file,max_body_bytes=200000)
-        response=(self.http or broker.request_api)(method=spec['method'],url=spec['url'],headers=headers,body=spec['body'],addresses=addresses,
+        response=(self.http or broker.request_api)(method=spec['method'],url=spec['url'],headers=headers,body=wire_body,addresses=addresses,
             approval_digest=approval['digest'],auth_origin=self.config['origin'])
         body=response.body.decode('utf-8',errors='replace')
+        if self.version>=7 and self.account: body=body.replace(self.account['password'],'[redacted account password]')
         if spec.get('capture_token'):
             # Kept in memory only; the journaled payload is redacted below.
             self._captured_bodies.append(body)

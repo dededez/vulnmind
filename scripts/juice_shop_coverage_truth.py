@@ -119,10 +119,11 @@ def main():
         anchored_challenges=sum(bool(e["source_anchors"]) for e in entries),
         multi_challenge_roots={k: v for k, v in sorted(by_root.items()) if len(v) > 1},
         target_overall_dynamic_coverage=0.5,
-        target_achievable_under_fixed_config=len(eligible) / len(dynamic_roots) > 0.5 if dynamic_roots else False,
+        target_achievable_under_fixed_config=None,
+        classification_status="provisional_manual_mapping_not_a_reachability_bound",
         note="总体动态覆盖率分母使用 dynamic_root_causes；固定配置内分母使用 eligible_anonymous_root_causes。na/static/env/unclear 不入总体分母。",
     )
-    payload = dict(schema_version="juice-shop-truth-1", created_date=seed["created_date"], status="classified",
+    payload = dict(schema_version="juice-shop-truth-1", created_date=seed["created_date"], status="provisional_manual_classification",
                    source=dict(repository=str(args.repo), seed=str(args.seed),
                                challenge_metadata="data/static/challenges.yml (key/name/category/difficulty/disabledEnv/description only)",
                                anchors="vuln-code-snippet vuln-line comments"),

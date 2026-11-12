@@ -26,3 +26,5 @@ tools: ["xss_context", "reflection", "browser_xss"]
 本卡是 VulnMind 项目编写的检测方法摘要，不是 OWASP 原文，也不是目标漏洞证据。
 
 检索词：cross site scripting XSS output encoding HTML context reflected input
+
+v7 浏览器复核必须包含无载荷对照、携带本次独有标记的载荷和重复验证。只接受标记完全匹配的 alert；正常页面弹窗、纯 DOM 反射、被阻断或不完整的页面不能确认载荷执行。脚本执行候选仍需评估上下文与影响。

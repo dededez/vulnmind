@@ -1,14 +1,16 @@
 ---
 skill_id: workbench.broken_access_control
 name: 对象级授权与越权
-version: 6.0.0
+version: 7.0.0
 target_type: both
 vuln_type: broken_access_control
 stage: investigation
 risk_level: low
-prerequisites: [authorized_target, exact_request_approval, test_account]
+prerequisites: [authorized_target, exact_request_approval, two_owned_identities_and_resources]
 tools: [auth_idor]
 ---
-用唯一授权的测试账号读取"自己的资源"作为基线，再读取相邻 ID 的同类型资源，只有服务端返回了**其他用户的资源**才记为候选。必须同时满足：基线 200 且含本人数据、目标资源 200 且 `UserId`/归属字段不属于本人、请求方法只读。401/403、空数据、返回本人资源都不能算越权。
+v7 使用两个不同的受控身份及各自已知归属的资源，接口路径、JSON 身份字段与 owner_only 访问策略由操作者声明。先验证两个本人访问基线，再交换身份读取，最后做两个匿名对照，总计 6 个只读 GET。不猜相邻编号，不使用预设购物篮编号。资源标识不同不能单独证明归属不同。
 
-不得修改、删除或写入他人资源；不得批量枚举 ID（每次最多 2 个相邻值）；不得使用他人凭据。返回 200 或页面可打开不等于越权，判定依赖响应体中的归属证据。
+基线身份不匹配、空数据、401/403 或返回本人资源不算越权。匿名也能读取时单列匿名私有资源读取线索；需独立核实策略与敏感性。即使交叉读取成功仍是候选，不因审计签名有效而提升成漏洞确认。公开资源不适用 owner_only 假设。
+
+v6 历史任务的单账号/种子编号协议仅用于 Juice Shop 兼容，不代表通用权限测试。

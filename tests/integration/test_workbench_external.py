@@ -161,13 +161,13 @@ def test_v3_routes_and_knowledge_are_frozen_and_old_replay_is_unchanged(workbenc
         assert UnifiedInvestigation(service.engine,row,service.settings,service.vault,http=forbidden,knowledge_provider=forbidden).run()['status']=='finished'
 
 
-def test_new_jobs_default_v6_and_explicit_legacy_is_preserved(workbench):
+def test_new_jobs_default_v7_and_explicit_legacy_is_preserved(workbench):
     service,data,_=workbench
     legacy=service.create(data)
     assert legacy['config']['pipeline_version']==1
     del data['pipeline_version']
     created=service.create(data)
-    assert created['config']['pipeline_version']==6
+    assert created['config']['pipeline_version']==7
     assert created['config']['tool_policy']=='external_preferred'
 
 

@@ -17,7 +17,7 @@ def verify_job(service,identifier):
         row=session.get(WorkbenchJob,identifier)
         if row is None or row.status!='finished': raise ValueError('调查尚未完成，无法校验最终报告')
         result=row.result
-        if result.get('schema_version') not in {'workbench-1','workbench-2','workbench-3','workbench-4','workbench-5','workbench-6'}: raise ValueError('unsupported report schema')
+        if result.get('schema_version') not in {'workbench-1','workbench-2','workbench-3','workbench-4','workbench-5','workbench-6','workbench-7'}: raise ValueError('unsupported report schema')
         chain=verify_complete_audit_chain(session.connection())
         if not chain.valid or chain.unhashed: raise ValueError('audit chain verification failed')
         steps=list(session.scalars(select(DurableStep).where(DurableStep.workflow_id.in_([identifier,uuid5(identifier,'repository')]))))
@@ -33,10 +33,12 @@ def verify_job(service,identifier):
         if json.loads(content)!={k:v for k,v in final.items() if k!='report_uri'}: raise ValueError('report identity mismatch')
         report=session.scalar(select(Report).where(Report.scan_id==UUID(final['scan_id']),Report.storage_uri==result['report_uri']))
         if report is None: raise ValueError('report database reference missing')
-        if final.get('schema_version') in {'workbench-2','workbench-3','workbench-4','workbench-5','workbench-6'}:
+        if final.get('schema_version') in {'workbench-2','workbench-3','workbench-4','workbench-5','workbench-6','workbench-7'}:
             from vulnmind.knowledge.skills import Skill
             from vulnmind.workbench.knowledge import validate_references
-            for index,saved in enumerate(final['knowledge']):
+            numbers=final.get('knowledge_round_numbers',list(range(len(final['knowledge']))))
+            if len(numbers)!=len(final['knowledge']) or len(set(numbers))!=len(numbers): raise ValueError('knowledge round identity mismatch')
+            for index,saved in zip(numbers,final['knowledge']):
                 recorded=next((s.payload for s in steps if s.workflow_id==identifier and s.stage==f'knowledge_{index}'),None)
                 if recorded!=saved: raise ValueError('knowledge snapshot link mismatch')
                 for skill in saved['skills']: Skill.model_validate(skill)
@@ -47,16 +49,16 @@ def verify_job(service,identifier):
                     value=next((s.payload for s in steps if s.workflow_id==identifier and s.stage==stage),None)
                     if value:
                         validate_references(value['knowledge_refs'],saved)
-                        if value.get('mode')=='model' and final['schema_version'] in {'workbench-5','workbench-6'}:
+                        if value.get('mode')=='model' and final['schema_version'] in {'workbench-5','workbench-6','workbench-7'}:
                             from vulnmind.workbench.context_calls import validate_manifest
                             validate_manifest(value,saved,stage)
             snapshots={digest(k):k for k in final['knowledge']}
             for observation in final['observations']:
                 if observation['knowledge_snapshot'] not in snapshots: raise ValueError('observation knowledge link missing')
                 validate_references(observation['method_refs'],snapshots[observation['knowledge_snapshot']])
-        if final.get('schema_version')in {'workbench-3','workbench-4','workbench-5','workbench-6'}:
+        if final.get('schema_version')in {'workbench-3','workbench-4','workbench-5','workbench-6','workbench-7'}:
             routing=next((s.payload for s in steps if s.workflow_id==identifier and s.stage=='tool_routing'),None)
-            if final.get('schema_version')in {'workbench-4','workbench-5','workbench-6'}:
+            if final.get('schema_version')in {'workbench-4','workbench-5','workbench-6','workbench-7'}:
                 priced=next((s.payload for s in steps if s.workflow_id==identifier and s.stage=='execution_routing'),None)
                 routing=priced['routing'] if priced else None
             if routing!=final.get('tool_routing'): raise ValueError('tool routing snapshot mismatch')

@@ -32,7 +32,7 @@ def planner_tool_context(choices, action_ids, policy):
     return dict(policy=policy,external=external,builtin=builtin,compact=True)
 
 
-def extend_context(engine,saved,routing,action_ids=None):
+def extend_context(engine,saved,routing,action_ids=None,*,selected_only=False):
     all_choices=routing.get('choices') or {}
     if action_ids is None:
         filtered=all_choices
@@ -40,6 +40,7 @@ def extend_context(engine,saved,routing,action_ids=None):
         filtered={identifier:all_choices[identifier] for identifier in action_ids if identifier in all_choices}
     tool_ids={c['tool_id'] for choice in filtered.values() for c in choice.get('considered',[])
               if c['provider']=='hexstrike'}
+    if selected_only: tool_ids=set()
     tool_ids.update(choice['selected'] for choice in filtered.values()
                     if str(choice.get('selected','')).startswith('hexstrike.'))
     loader=SkillLoader(ROOT/'skills')

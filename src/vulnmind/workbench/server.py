@@ -70,13 +70,14 @@ def make_server(service,port=8765):
                     if len(parts)==5 and parts[4]=='coverage':
                         # Explicit operator action: offline evaluation against a frozen
                         # truth file. The engine never reads this data.
-                        from vulnmind.workbench.coverage import build_report
-                        truth_path=Path(os.environ.get('VULNMIND_COVERAGE_TRUTH',
-                                                       'evaluation/juice_shop_coverage_ground_truth_20261111.json'))
+                        from vulnmind.workbench.generic_coverage import build_report
+                        truth_setting=os.environ.get('VULNMIND_COVERAGE_TRUTH')
+                        if not truth_setting: raise ValueError('尚未配置与当前目标匹配的通用评估基准；不会套用其他应用的漏洞清单')
+                        truth_path=Path(truth_setting)
                         if not truth_path.is_file(): raise ValueError('未找到离线真值文件，请设置 VULNMIND_COVERAGE_TRUTH')
                         if detail['status']!='finished': raise ValueError('任务尚未完成，无法生成覆盖率')
                         truth=json.loads(truth_path.read_text(encoding='utf-8'))
-                        report,_,_=build_report(truth,detail['result'] or {},'ui')
+                        report,_,_=build_report(truth,detail['result'] or {},'ui',config=detail['config'])
                         return self.reply(200,report)
                     return self.reply(200,detail)
                 self.reply(404,dict(error='not found'))
@@ -98,18 +99,16 @@ def make_server(service,port=8765):
                 elif path=='/api/demo':
                     from vulnmind.workbench.demo import configuration
                     result=configuration(service)
-                elif path=='/api/jobs': result=service.create(data)
+                elif path=='/api/jobs': result=service.create_current(data)
                 elif path=='/api/credentials':
                     result=dict(id=service.vault.save(data['origin'].rstrip('/'),data['kind'],data['value']))
-                elif path=='/api/accounts':
-                    # The server generates one throwaway test account; the password never
-                    # reaches the browser and is stored DPAPI-encrypted only.
-                    from vulnmind.workbench.account import random_account
-                    account=random_account()
-                    identifier=service.vault.save_account(data['origin'].rstrip('/'),account['email'],account['password'])
-                    result=dict(id=identifier,email=account['email'])
+                elif path=='/api/accounts': raise ValueError('请通过通用凭据接口配置已有测试身份')
                 elif path.startswith('/api/jobs/'):
                     parts=path.split('/');identifier,action=parts[3],parts[4]
+                    current=service.detail(identifier)
+                    cfg=current['config']
+                    if action in {'start','approve','recover'} and current['status']!='finished' and (cfg.get('pipeline_version',1)!=7 or cfg.get('target_adapter','generic')!='generic'):
+                        raise ValueError('旧专用流程仅保留记录；请按实际接口和凭据新建通用调查')
                     if action=='start': result=service.start(identifier)
                     elif action=='approve': result=service.decide(identifier,data['approval_id'],data['approved'])
                     elif action=='recover': result=service.recover(identifier,data)

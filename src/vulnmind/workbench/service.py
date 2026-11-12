@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 from uuid import UUID,uuid4,uuid5
 from typing import Literal
 
-from pydantic import BaseModel,ConfigDict,Field
+from pydantic import BaseModel,ConfigDict,Field,model_validator
 from sqlalchemy import select,func
 from sqlalchemy.orm import Session
 from vulnmind.persistence.models import WorkbenchJob,Project,DurableStep,Approval,Scan
@@ -35,7 +35,9 @@ class JobInput(BaseModel):
     agents:bool=False
     rounds:int=Field(default=2,ge=1,le=3)
     request_budget:int=Field(default=18,ge=3,le=400)
-    pipeline_version:Literal[1,2,3,4,5,6]=6
+    pipeline_version:Literal[1,2,3,4,5,6,7]=7
+    target_adapter:Literal['generic','juice_shop']='generic'
+    access_checks:list[dict]=Field(default_factory=list,max_length=8)
     tool_policy:Literal['external_preferred','builtin_only']='external_preferred'
     external_execution:bool=False
     external_recon:bool=False
@@ -49,6 +51,20 @@ class JobInput(BaseModel):
     credential_profile:str|None=None
     routes:dict|list=Field(default_factory=list)
 
+    @model_validator(mode='after')
+    def validate_adapter(self):
+        if self.pipeline_version>=7:
+            if self.target_adapter=='generic' and (self.account_profile or self.auth_probe):
+                raise ValueError('通用模式使用已有凭据；自动注册和固定登录探针需要显式选择 Juice Shop 适配器')
+            lab_kinds={'sql_login','weak_password','config_exposure','well_known_exposure'}
+            if self.target_adapter=='generic' and lab_kinds.intersection(self.detectors):
+                raise ValueError('所选固定端点探针属于 Juice Shop 适配器，通用模式不执行')
+            if 'auth_idor' in self.detectors and not self.access_checks:
+                raise ValueError('双身份检查需要 access_checks：两个凭据、各自资源及访问策略')
+            from vulnmind.workbench.access_control import AccessCheck
+            self.access_checks=[AccessCheck.model_validate(c).model_dump(mode='json') for c in self.access_checks]
+        return self
+
 
 class Workbench:
     def __init__(self,engine,settings,root,*,runner=UnifiedInvestigation):
@@ -61,6 +77,14 @@ class Workbench:
         with Session(engine) as session,session.begin():
             for row in session.scalars(select(WorkbenchJob).where(WorkbenchJob.status.in_(['queued','running']))):
                 row.status='interrupted'
+
+    def create_current(self,data):
+        # Public creation never selects a target-specific or historical protocol.
+        if data.get('target_adapter','generic')!='generic' or data.get('pipeline_version',7)!=7:
+            raise ValueError('新任务仅支持通用扫描；不再接受目标适配器或旧流水线')
+        if data.get('account_profile') or data.get('auth_probe'):
+            raise ValueError('请使用通用凭据及双身份配置，不再创建固定注册或登录探针')
+        return self.create({**data,'pipeline_version':7,'target_adapter':'generic'})
 
     def create(self,data):
         value=JobInput.model_validate(data)
@@ -80,6 +104,12 @@ class Workbench:
         check_target(Target(type='web',locator=origin+'/'),scope)
         imported_routes(value.routes,origin)
         if value.credential_profile: self.vault.load(value.credential_profile,origin)
+        for check in value.access_checks:
+            if self.vault.load(check['credential_a'],origin)==self.vault.load(check['credential_b'],origin):
+                raise ValueError('两个身份档案包含相同凭据，不能作为跨账号对照')
+            for role in ('a','b'):
+                check_target(Target(type='web',locator=check['resource_'+role]),scope)
+                self.vault.load(check['credential_'+role],origin)
         if value.account_profile: self.vault.load_account(value.account_profile,origin)
         config=value.model_dump(exclude={'name','hours','allowed_ip_networks','authorization_source'})
         # Persist only sanitized import structure. HAR cookies, bodies and headers never enter the job.

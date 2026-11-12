@@ -1,3 +1,5 @@
+> 最新：新任务统一使用通用模式；产品不再提供目标适配器或固定靶场探针。使用说明见 [通用扫描](docs/GENERIC_SCANNING.md)，验证与边界见 [修复交付](docs/GENERIC_REPAIR_DELIVERY_20261111.md)。
+
 # VulnMind
 
 **面向授权仓库与 Web 目标的本机安全分析工作台**：把源码线索、部署声明、受控请求、证据与独立复核串成一条可恢复、可校验的证据链。
@@ -72,9 +74,13 @@ copy .env.example .env    # 填写数据库、审批密钥等
 ### 打开工作台
 
 ```powershell
-.\start-workbench.ps1
-# 或
-.\.venv\Scripts\python.exe -m vulnmind ui --port 8765
+# 方式一：后台常驻（推荐；关闭终端后仍运行，页面会在服务重启后自动重连）
+.\start-workbench-background.cmd
+# 停止后台服务
+.\start-workbench-background.cmd -Stop
+
+# 方式二：前台运行（Ctrl+C 停止）
+.\start-workbench.cmd
 ```
 
 浏览器访问 **http://127.0.0.1:8765**，点击「本地演示靶场」可跑一个自带 fixture 的完整流程，无需外部目标。

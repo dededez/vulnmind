@@ -7,7 +7,7 @@
 ```powershell
 .\.venv\Scripts\python.exe -m vulnmind --version      # VulnMind 0.2.0 (workbench v6)
 .\.venv\Scripts\python.exe -m vulnmind doctor         # 期望 schema=head 0018，审计链 valid
-.\start-workbench.ps1                                 # 或 python -m vulnmind ui --port 8765
+.\start-workbench-background.cmd                        # 后台常驻；.\start-workbench-background.cmd -Stop 停止
 ```
 
 浏览器打开 `http://127.0.0.1:8765`。首次使用可点"本地演示靶场"跑一个自有 fixture；真实目标需要填写本机仓库、部署 Origin、部署版本、授权依据与允许网段，并确认绑定。
