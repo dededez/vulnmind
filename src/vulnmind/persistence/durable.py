@@ -140,7 +140,25 @@ class Journal:
             SessionAuditSink(session).record(self._event(row, "started"))
             operation, attempt = row.id, row.attempt
         # No business transaction or audit-chain lock during model/tool IO.
-        output = compute(LinkedAudit(self.engine, operation, self.target_type))
+        try:
+            output = compute(LinkedAudit(self.engine, operation, self.target_type))
+        except Exception as exc:
+            # A deterministic failure must not look like an in-flight stage. Persist
+            # the failure first, then record the audit best-effort so a broken audit
+            # chain cannot hide the original error.
+            try:
+                with Session(self.engine) as session, session.begin():
+                    row = session.get(DurableStep, operation)
+                    if row is not None and row.status == "running" and row.attempt == attempt:
+                        row.status = "failed"
+                        row.payload = {"error_type": type(exc).__name__, "error": str(exc)[:300]}
+                try:
+                    DatabaseAuditSink(self.engine).record(self._event(row, "failed"))
+                except AuditError:
+                    pass
+            except Exception:
+                pass
+            raise
         if not isinstance(output, dict):
             raise ValueError("stage output must be an object")
         digest(output)
@@ -165,8 +183,8 @@ def recover_step(engine, workflow_id, stage, action, actor, reason, acknowledged
     with workflow_lock(engine, workflow_id), Session(engine) as session, session.begin():
         row = session.scalar(select(DurableStep).where(DurableStep.workflow_id == workflow_id,
                                                       DurableStep.stage == stage))
-        if row is None or row.status != "running":
-            raise ValueError("only interrupted running stages can be recovered")
+        if row is None or row.status not in {"running", "failed"}:
+            raise ValueError("only interrupted or failed stages can be recovered")
         row.status = "ready" if action == "retry" else "aborted"
         if action == "abort":
             scan = session.get(Scan, uuid5(workflow_id, "scan-v2"))

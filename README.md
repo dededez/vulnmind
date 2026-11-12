@@ -43,7 +43,7 @@ VulnMind 把这些步骤做成一个**有预算、有审批、有证据、可恢
 ### 依赖
 
 - Python **3.11+**（开发环境为 3.13）
-- PostgreSQL **17 + pgvector**（迁移头 `0018_workbench_jobs`）
+- PostgreSQL **17 + pgvector**（迁移头 `0019_durable_step_failed`）
 - 可选：WSL 发行版（隔离 HTTP 出口与外部工具）、`DEEPSEEK_API_KEY`（模型规划）、Playwright + Edge（浏览器复核）
 
 ### 安装

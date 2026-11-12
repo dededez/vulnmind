@@ -164,8 +164,10 @@ def main():
             raise ValueError("request too large")
         data = json.loads(raw)
         result = request(data)
-    except Exception:
-        print('{"error":"isolated broker request failed"}')
+    except Exception as exc:
+        # Bounded reason only: no traceback, paths or target data in the job record.
+        detail = (type(exc).__name__ + ": " + str(exc))[:200]
+        print(json.dumps({"error": "isolated broker request failed", "detail": detail}))
         return 2
     print(json.dumps(result))
     return 0

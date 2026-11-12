@@ -169,6 +169,12 @@ class Workbench:
             traceback.print_exc()  # local operator log only; the job message stays generic
             result=dict(status='unknown',error_type=type(exc).__name__,message='执行未完成。查看阶段记录；未知外部调用不会自动重发。')
             if type(exc) is ValueError: result['message']=str(exc)[:300]
+            # Policy/transport denials carry safe, actionable text (no target data or secrets).
+            try:
+                from vulnmind.tools.http import HttpDenied
+                if isinstance(exc,HttpDenied): result['message']=str(exc)[:300]
+            except ImportError:
+                pass
         with Session(self.engine) as session,session.begin():
             saved=session.get(WorkbenchJob,identifier)
             saved.status=result['status'];saved.result=result;saved.updated_at=datetime.now(timezone.utc)

@@ -40,6 +40,21 @@ def test_migration_columns_match_orm(monkeypatch):
         # Indexes are not compared here; the live tests check them in PostgreSQL.
         return None
 
+    class _FakeBatch:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc):
+            return False
+
+        @staticmethod
+        def drop_constraint(*_args, **_kwargs):
+            return None
+
+        @staticmethod
+        def create_check_constraint(*_args, **_kwargs):
+            return None
+
     versions = Path(__file__).resolve().parents[2] / "migrations/versions"
     for index, migration in enumerate(sorted(versions.glob("[0-9]*.py"))):
         spec = importlib.util.spec_from_file_location(f"test_migration_{index}", migration)
@@ -51,6 +66,7 @@ def test_migration_columns_match_orm(monkeypatch):
         monkeypatch.setattr(module.op, "create_index", create_index)
         monkeypatch.setattr(module.op, "drop_index", lambda *args, **kwargs: None)
         monkeypatch.setattr(module.op, "execute", lambda statement: statements.append(str(statement)))
+        monkeypatch.setattr(module.op, "batch_alter_table", lambda *_args, **_kwargs: _FakeBatch())
         # A dimension-changing migration checks for stored vectors first; the
         # offline replay has no database, so it reports "no vectors".
         monkeypatch.setattr(module.op, "get_bind", _FakeBind)

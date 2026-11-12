@@ -134,8 +134,8 @@ def serve(port=8765):
         raise ValueError('请先配置数据库与报告/证据目录')
     engine=create_engine(settings.database_url)
     with engine.connect() as conn:
-        if conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one()!='0018_workbench_jobs':
-            raise ValueError('请先备份并升级数据库至 0018_workbench_jobs')
+        if conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one()!='0019_durable_step_failed':
+            raise ValueError('请先备份并升级数据库至 0019_durable_step_failed')
     root=Path(settings.report_root).resolve().parent/'workbench'
     service=Workbench(engine,settings,root)
     server=make_server(service,port)

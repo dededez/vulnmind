@@ -44,9 +44,19 @@ class IsolatedHttpBroker:
                    "/usr/bin/python3", "-I", "-c", source]
         try:
             result = subprocess.run(command, input=json.dumps(data).encode(), stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL, timeout=timeout + 10, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                stderr=subprocess.PIPE, timeout=timeout + 10, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             if result.returncode or len(result.stdout) > 2_000_000:
-                raise HttpDenied("isolated broker failed")
+                # Keep a bounded, printable reason so a policy/transport failure is
+                # actionable instead of a bare "broker failed".
+                reason = (result.stderr or b"")[-400:].decode("utf-8", "replace")
+                reason = " ".join(char for char in reason if char.isprintable()).strip()
+                try:
+                    payload = json.loads(result.stdout or b"{}")
+                    detail = (payload.get("detail") or payload.get("error")) if isinstance(payload, dict) else None
+                except ValueError:
+                    detail = None
+                hint = (str(detail) if detail else reason)[:200]
+                raise HttpDenied("isolated broker failed" + (": " + hint if hint else ""))
             response = json.loads(result.stdout)
             return HopResponse(status_code=response["status_code"], headers=response["headers"],
                 body=base64.b64decode(response["body"], validate=True), truncated=response["truncated"],

@@ -48,7 +48,7 @@ class DurableStep(Base):
     __tablename__ = "durable_steps"
     __table_args__ = (
         UniqueConstraint("workflow_id", "stage", name="uq_durable_step"),
-        CheckConstraint("status IN ('ready', 'running', 'completed', 'aborted')", name="ck_durable_step_status"),
+        CheckConstraint("status IN ('ready', 'running', 'completed', 'aborted', 'failed')", name="ck_durable_step_status"),
         CheckConstraint("attempt >= 1", name="ck_durable_step_attempt"),
         CheckConstraint("(status = 'completed' AND payload IS NOT NULL AND output_digest IS NOT NULL) OR "
                         "(status != 'completed' AND output_digest IS NULL)", name="ck_durable_step_receipt"),
