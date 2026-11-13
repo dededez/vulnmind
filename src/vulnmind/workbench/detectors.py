@@ -238,7 +238,9 @@ def evaluate(action, responses):
     kind = action['kind']
     if kind in {'sql_login', 'weak_password', 'config_exposure', 'well_known_exposure', 'exposed_file'}:
         return evaluate_probe(action, responses)
-    if kind in {'reflection', 'template_expression', 'sql_error'}:
+    if kind == 'sql_error':
+        result = evaluate_sql_error(action, responses)
+    elif kind in {'reflection', 'template_expression'}:
         result = legacy.evaluate(action, responses)
     else:
         bodies = [r['body'] for r in responses]
@@ -342,3 +344,33 @@ def evaluate_probe(action,responses):
     if action['kind']=='exposed_file': return evaluate_file(action,responses)
     from vulnmind.workbench.adapters.juice_shop import evaluate_probe as legacy
     return legacy(action,responses)
+
+
+def evaluate_sql_error(action, responses):
+    """Preserve SQL-specific anomalies against stable rejected baselines."""
+    result = legacy.evaluate(action, responses)
+    baseline, probe, control = responses
+    signatures = ('sqlstate[', 'you have an error in your sql syntax',
+                  'syntax error at or near', 'unclosed quotation mark',
+                  'sqlite_error', 'sqlite error', 'sqlite3.operationalerror',
+                  'unrecognized token', 'syntax error near')
+    stable = (baseline['status_code'] == control['status_code']
+              and baseline['body'] == control['body'])
+    complete = not any(r['truncated'] for r in responses)
+    distinct_error = any(s in probe['body'].lower()
+                         and s not in baseline['body'].lower()
+                         and s not in control['body'].lower() for s in signatures)
+    # A forbidden probe may be a WAF page, not a database response.
+    usable = (probe['status_code'] not in {401, 403}
+              and baseline['status_code'] != 403)
+    result.update(verdict='inconclusive', behavior=None)
+    if complete and stable and usable and distinct_error:
+        result.update(verdict='candidate',
+                      detail='稳定对照下测试输入独有 SQL 数据库错误；保留异常差分候选，仍需重复复测及影响确认')
+    elif not complete or not stable:
+        result['detail'] = '响应截断或对照不稳定，无法判断 SQL 错误差分'
+    elif any(r['status_code'] in {401, 403} for r in responses):
+        result['detail'] = '存在认证或访问限制，未取得可靠 SQL 特征；登录接口的拒绝响应本身不表示凭据配置错误'
+    else:
+        result['detail'] = '未取得 SQL 专属错误差分；普通服务错误或组件名称不构成注入证据'
+    return result

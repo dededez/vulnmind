@@ -365,7 +365,7 @@ class UnifiedInvestigation:
             budget=prepared['plan']['budget'],
         )
 
-    def execute_external_action(self,binding,approval,source):
+    def execute_external_action(self,binding,approval,source,reservation=None):
         if 'validate-run' not in self.settings.enabled_http_commands:
             raise ValueError('validate-run capability is disabled')
         verify_snapshot(source)
@@ -376,13 +376,14 @@ class UnifiedInvestigation:
             if row is None or row.status!='consumed' or expiry is None or expiry<=datetime.now(timezone.utc) or row.operation_hash!=approval['digest']:
                 raise ValueError('consumed approval is no longer valid')
         service=self.external_service()
-        if self.version>=6: self.budget.reserve('mcp:'+str(binding['execution_id']),binding['budget']['requests'])
+        reservation=reservation or 'mcp:'+str(binding['execution_id'])
+        if self.version>=6: self.budget.reserve(reservation,binding['budget']['requests'])
         out=service.execute(binding['execution_id'],binding['digest'])
         execution=out['execution']
         if execution['status'] not in {'succeeded','tool_failed'}:
             raise StepUnknown('inspect external MCP execution '+str(binding['execution_id']))
         res=execution.get('result') or {}
-        if self.version>=6: self.budget.settle('mcp:'+str(binding['execution_id']),int(res.get('requests_used',0)))
+        if self.version>=6: self.budget.settle(reservation,int(res.get('requests_used',0)))
         body=json.dumps(res,ensure_ascii=False,sort_keys=True)
         histogram=res.get('upstream_status') or {}
         status_code,codes=upstream_status_code(res)
@@ -871,7 +872,7 @@ class UnifiedInvestigation:
                         binding=ext_bindings[action['id']]
                         stage='mcp_'+action['id']
                         mcp_resp=self.stage(stage,dict(binding=binding,approval=approval),
-                            lambda audit,b=binding:self.execute_external_action(b,approval,source))
+                            lambda audit,b=binding:self.execute_external_action(b,approval,source,reservation if self.version>=7 else None))
                         result=self.evaluate_external(action,mcp_resp)
                         actual=int(mcp_resp.get('requests_used',1))
                         if self.version>=6: self.budget.settle(reservation,actual)
@@ -924,6 +925,9 @@ class UnifiedInvestigation:
                     break
             if self.stop_reason is None:
                 self.stop_reason='max_rounds'
+            if self.version>=7:
+                from vulnmind.workbench.batches import effective_stop_reason
+                self.stop_reason=effective_stop_reason(self.stop_reason,self.budget.snapshot())
             reported_used=self.budget.snapshot()['charged'] if self.version>=6 else used
             final=self.stage('report',dict(source=source['digest'],observations=observations,critics=critiques),
                 lambda _: dict(schema_version='workbench-'+str(self.version),job_id=str(self.job.id),scan_id=str(self.scan),name=self.job.name,

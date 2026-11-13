@@ -46,3 +46,10 @@ def deduplicated_findings(observations):
             evidence_ids=[],methods=[],status='candidate',counts_as_confirmed_vulnerability=False))
         group['evidence_ids'].append(o.get('evidence_id'));group['methods'].append(o['kind'])
     return list(groups.values())
+
+
+def effective_stop_reason(reason, ledger):
+    """Final accounting takes precedence over a coincident round/critic stop."""
+    if ledger['available'] == 0:
+        return 'budget_exhausted'
+    return reason or 'max_rounds'
